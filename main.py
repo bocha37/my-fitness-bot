@@ -13,8 +13,8 @@ async def cmd_start(message: Message):
     web_app_url = "https://fitness-webapp.vercel.app/index.html" 
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🧮 Рассчитать БЖУ", web_app={"url": "https://fitness-webapp.vercel.app"})],
-        [InlineKeyboardButton(text="✉️ Личный вопрос", web_app={"url": "https://fitness-webapp.vercel.app/question.html"})] 
+        [InlineKeyboardButton(text="🧮 Рассчитать БЖУ", web_app={"url": "https://fitnessbo4a-webapp.vercel.app"})],
+        [InlineKeyboardButton(text="✉️ Личный вопрос", web_app={"url": "https://fitnessbo4a-webapp.vercel.app/question.html"})] 
     ])
 
     await message.answer("Привет! Выберите, что вас интересует:", reply_markup=keyboard)
