@@ -1,54 +1,55 @@
 from aiogram import Bot, Dispatcher
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.filters import F, StateFilter
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import StatesGroup, State
-import os
+from aiogram.filters import CommandStart
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiohttp import web
+import asyncio
 
-# === Подготовка ===
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
-
+# Токен бота
+BOT_TOKEN = "7572534113:AAFdRB_U0KSVK0rCTYlnPgd_Z2-Ij0WXZ0k"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# === FSM для вопросов ===
-class QuestionState(StatesGroup):
-    waiting_for_question = State()
+# Хранение вопросов (можно потом сохранять в БД)
+questions = []
+
+# === API маршрут для получения данных с WebApp ===
+async def receive_question(request):
+    try:
+        data = await request.json()
+        question_text = data.get("question")
+        user_id = data.get("user_id")
+
+        if question_text and user_id:
+            questions.append({"user_id": user_id, "question": question_text})
+            print(f"Получен вопрос от {user_id}: {question_text}")
+            return web.json_response({"status": "ok"})
+        else:
+            return web.json_response({"status": "error", "message": "Invalid data"}, status=400)
+    except Exception as e:
+        print("Ошибка:", e)
+        return web.json_response({"status": "error", "message": "Server error"}, status=500)
 
 # === Команда /start ===
-@dp.message(F.text == "/start")
+@dp.message(CommandStart())
 async def cmd_start(message: Message):
-    web_app_url = "https://fitnessbo4a-webapp.vercel.app/index.html" 
-
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🧮 Рассчитать БЖУ", web_app={"url": web_app_url})],
+        [InlineKeyboardButton(text="🧮 Рассчитать БЖУ", web_app={"url": "https://fitnessbo4a-webapp.vercel.app"})], 
         [InlineKeyboardButton(text="✉️ Личный вопрос", web_app={"url": "https://fitnessbo4a-webapp.vercel.app/question.html"})] 
     ])
-
     await message.answer("Привет! Выберите, что вас интересует:", reply_markup=keyboard)
 
-# === Ответ администратора ===
-@dp.message(F.from_user.id == ADMIN_ID, F.reply_to_message)
-async def answer_to_user(message: Message):
-    original = message.reply_to_message
+# === Запуск бота + веб-сервера ===
+async def start_bot_and_server():
+    app = web.Application()
+    app.router.add_post('/question', receive_question)  # Маршрут для получения вопросов
 
-    if not original or not original.text.startswith("📩 Вопрос от пользователя"):
-        await message.answer("Вы можете отвечать только на вопросы от пользователей.")
-        return
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, port=8080)
+    await site.start()
 
-    try:
-        user_id = int(original.text.split()[5])  # "Вопрос от пользователя 123456789..."
-    except (IndexError, ValueError):
-        await message.answer("Не удалось определить ID пользователя.")
-        return
+    print("Бот и сервер запущены...")
+    await dp.start_polling(bot)
 
-    try:
-        await bot.send_message(user_id, f"💬 Ответ от эксперта:\n{message.text}")
-        await message.answer(f"✅ Ответ отправлен пользователю {user_id}.")
-    except Exception as e:
-        await message.answer(f"❌ Не удалось отправить ответ: {e}")
-
-# === Если ты хочешь тестировать локально — запуск бота ===
 if __name__ == "__main__":
-    dp.run_polling(bot)
+    asyncio.run(start_bot_and_server())
